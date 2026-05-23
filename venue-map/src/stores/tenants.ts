@@ -2,19 +2,10 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { Tenant } from '@/types'
 import { INITIAL_TENANTS, UNPLACED_TENANTS } from '@/data/seed'
-import { loadState, saveState } from '@/services/storage'
-
-const STATE_KEY = 'venuemap:state:v1'
-
-interface PersistedState {
-  tenants: Tenant[]
-  unplaced: Tenant[]
-}
 
 export const useTenantsStore = defineStore('tenants', () => {
-  const saved = loadState<PersistedState>(STATE_KEY)
-  const tenants = ref<Tenant[]>(saved?.tenants ?? INITIAL_TENANTS.map((t) => ({ ...t })))
-  const unplaced = ref<Tenant[]>(saved?.unplaced ?? UNPLACED_TENANTS.map((t) => ({ ...t })))
+  const tenants = ref<Tenant[]>(INITIAL_TENANTS.map((t) => ({ ...t })))
+  const unplaced = ref<Tenant[]>(UNPLACED_TENANTS.map((t) => ({ ...t })))
   const selectedIds = ref<Set<string>>(new Set())
 
   // History (snapshot-based undo/redo)
@@ -23,15 +14,6 @@ export const useTenantsStore = defineStore('tenants', () => {
 
   const canUndo = computed(() => past.value.length > 0)
   const canRedo = computed(() => future.value.length > 0)
-
-  function persist() {
-    saveState<PersistedState>(STATE_KEY, {
-      tenants: tenants.value,
-      unplaced: unplaced.value,
-    })
-    // Flash save in UI store (lazy import to avoid circular deps)
-    import('./ui').then(({ useUIStore }) => useUIStore().flashSave())
-  }
 
   function pushHistory() {
     past.value.push(tenants.value.map((t) => ({ ...t })))
@@ -42,13 +24,11 @@ export const useTenantsStore = defineStore('tenants', () => {
   function updateTenant(id: string, patch: Partial<Tenant>, recordHistory = true) {
     if (recordHistory) pushHistory()
     tenants.value = tenants.value.map((t) => (t.id === id ? { ...t, ...patch } : t))
-    persist()
   }
 
   function updateTenants(fn: (prev: Tenant[]) => Tenant[], recordHistory = true) {
     if (recordHistory) pushHistory()
     tenants.value = fn(tenants.value)
-    persist()
   }
 
   let moveBuffer: ReturnType<typeof setTimeout> | null = null
@@ -60,7 +40,6 @@ export const useTenantsStore = defineStore('tenants', () => {
       }, 250)
     }
     tenants.value = tenants.value.map((t) => (updates[t.id] ? { ...t, ...updates[t.id] } : t))
-    persist()
   }
 
   function resizeTenant(id: string, dims: { w: number; h: number }) {
@@ -71,20 +50,17 @@ export const useTenantsStore = defineStore('tenants', () => {
       }, 250)
     }
     tenants.value = tenants.value.map((t) => (t.id === id ? { ...t, ...dims } : t))
-    persist()
   }
 
   function addTenant(tenant: Tenant) {
     pushHistory()
     tenants.value = [...tenants.value, tenant]
-    persist()
   }
 
   function deleteTenants(ids: string[]) {
     pushHistory()
     tenants.value = tenants.value.filter((t) => !ids.includes(t.id))
     selectedIds.value = new Set([...selectedIds.value].filter((id) => !ids.includes(id)))
-    persist()
   }
 
   function placeFromUnplaced(
@@ -101,7 +77,6 @@ export const useTenantsStore = defineStore('tenants', () => {
     pushHistory()
     tenants.value = [...tenants.value, newTenant]
     unplaced.value = unplaced.value.filter((up) => up.id !== unplacedId)
-    persist()
     return newId
   }
 
@@ -112,9 +87,8 @@ export const useTenantsStore = defineStore('tenants', () => {
       map[id] = num
     })
     tenants.value = tenants.value.map((t) =>
-      map[t.id] !== undefined ? { ...t, num: map[t.id] } : t,
+      t.id in map ? { ...t, num: map[t.id] } : t,
     )
-    persist()
   }
 
   function undo() {
@@ -122,7 +96,6 @@ export const useTenantsStore = defineStore('tenants', () => {
     if (!snapshot) return
     future.value.push(tenants.value.map((t) => ({ ...t })))
     tenants.value = snapshot
-    persist()
   }
 
   function redo() {
@@ -130,7 +103,6 @@ export const useTenantsStore = defineStore('tenants', () => {
     if (!snapshot) return
     past.value.push(tenants.value.map((t) => ({ ...t })))
     tenants.value = snapshot
-    persist()
   }
 
   function resetToSeed() {
@@ -140,7 +112,6 @@ export const useTenantsStore = defineStore('tenants', () => {
     selectedIds.value = new Set()
     past.value = []
     future.value = []
-    persist()
   }
 
   function computeNextStart(): number {

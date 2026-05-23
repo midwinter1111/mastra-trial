@@ -5,8 +5,8 @@
 ## セットアップ
 
 ```bash
-npm install
-npm run dev
+pnpm run ci
+pnpm start
 ```
 
 ## 環境変数
@@ -24,13 +24,13 @@ cp .env.example .env.local
 ### Windows PowerShell でシェルから注入する場合
 
 ```powershell
-$env:VITE_ANTHROPIC_API_KEY=$env:ANTHROPIC_API_KEY; npm run dev
+$env:VITE_ANTHROPIC_API_KEY=$env:ANTHROPIC_API_KEY; pnpm start
 ```
 
 ### macOS / Linux
 
 ```bash
-VITE_ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY npm run dev
+VITE_ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY pnpm start
 ```
 
 ## セキュリティ注意事項

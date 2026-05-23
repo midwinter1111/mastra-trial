@@ -1,2 +1,17 @@
 # 実装時の参照用プロトタイプ — ソースコードからは利用していない
 handoff/
+
+# 依存パッケージ
+node_modules/
+
+# ビルド成果物
+dist/
+dist-ssr/
+
+# 環境変数ファイル
+.env.local
+.env.*.local
+
+# OS・エディタ
+.DS_Store
+*.local

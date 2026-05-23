@@ -3,15 +3,17 @@ import { storeToRefs } from 'pinia'
 import { useTenantsStore } from '@/stores/tenants'
 import { useToolsStore } from '@/stores/tools'
 import { useUIStore } from '@/stores/ui'
+import { useAIStore } from '@/stores/ai'
 import Icon from './icons/Icon.vue'
 
 const tenantsStore = useTenantsStore()
 const toolsStore = useToolsStore()
 const uiStore = useUIStore()
+const aiStore = useAIStore()
 
 const { canUndo, canRedo, selectedIds } = storeToRefs(tenantsStore)
 const { mode } = storeToRefs(toolsStore)
-const { saving, lastSaved } = storeToRefs(uiStore)
+const { panelOpen } = storeToRefs(aiStore)
 </script>
 
 <template>
@@ -71,11 +73,6 @@ const { saving, lastSaved } = storeToRefs(uiStore)
 
     <div class="top-divider" />
 
-    <div :class="['save-status', saving && 'saving']">
-      <span class="pulse" />
-      <span>{{ saving ? '保存中…' : lastSaved ? `保存済み · ${lastSaved}` : '未保存' }}</span>
-    </div>
-
     <button
       v-if="selectedIds.size > 0"
       class="btn sm"
@@ -83,6 +80,15 @@ const { saving, lastSaved } = storeToRefs(uiStore)
     >
       <Icon name="number" />
       <span>番号付与</span>
+    </button>
+
+    <button
+      :class="['btn', 'sm', panelOpen ? 'primary' : 'ghost', 'ai-btn']"
+      title="AIアシスタント"
+      @click="aiStore.togglePanel()"
+    >
+      <Icon name="ai_sparkle" />
+      <span>AI</span>
     </button>
 
     <button class="btn sm primary">
@@ -169,7 +175,5 @@ const { saving, lastSaved } = storeToRefs(uiStore)
 .mode-tab svg { width: 13px; height: 13px; }
 .mode-tab.on { background: var(--surface); color: var(--ink-1); box-shadow: var(--shadow-sm); font-weight: 600; }
 
-.save-status { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink-3); padding: 0 8px; white-space: nowrap; }
-.save-status .pulse { width: 6px; height: 6px; border-radius: 50%; background: var(--status-open); }
-.save-status.saving .pulse { background: var(--status-prep); animation: pulse 1.2s infinite ease-in-out; }
+.ai-btn.primary { background: var(--accent); color: var(--on-accent); }
 </style>

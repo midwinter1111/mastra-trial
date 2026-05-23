@@ -15,6 +15,7 @@ import TweaksPanel from '@/components/tweaks/TweaksPanel.vue'
 import DetailModal from '@/components/modals/DetailModal.vue'
 import EditModal from '@/components/modals/EditModal.vue'
 import AssignModal from '@/components/modals/AssignModal.vue'
+import AiChat from '@/components/AiChat.vue'
 
 const tenantsStore = useTenantsStore()
 const toolsStore = useToolsStore()
@@ -136,6 +137,9 @@ onUnmounted(() => globalThis.removeEventListener('keydown', onKeydown))
     <MapCanvas />
     <Inspector v-if="showInspector" />
     <StatusBar />
+
+    <!-- AI Chat panel -->
+    <AiChat />
 
     <!-- Tweaks panel -->
     <TweaksPanel :open="tweaksPanelOpen" @update:open="tweaksPanelOpen = $event" />

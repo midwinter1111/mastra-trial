@@ -173,8 +173,8 @@ const statusLabel = computed(() => {
   gap: 4px;
 }
 .pin {
-  width: 32px;
-  height: 32px;
+  width: 40px;
+  height: 40px;
   border-radius: 50% 50% 50% 0;
   display: flex;
   align-items: center;
@@ -186,7 +186,7 @@ const statusLabel = computed(() => {
 .pin-inner {
   transform: rotate(45deg);
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: 14px;
   font-weight: 800;
   color: #fff;
   display: block;
