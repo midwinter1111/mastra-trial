@@ -1,0 +1,94 @@
+/* ─────────────────────────────────────────────────────────
+   VenueMap Marché — デザイントークン (CSS変数)
+   casual/styles.css の :root 定義を移植
+   ───────────────────────────────────────────────────── */
+
+:root {
+  /* Surfaces */
+  --bg: #fbf6ed;
+  --bg-2: #f3ebd9;
+  --surface: #ffffff;
+  --surface-2: #fdf8ec;
+  --canvas: #f5eada;
+  --paper-line: rgba(139, 111, 71, 0.08);
+
+  --border: rgba(72, 54, 36, 0.12);
+  --border-strong: rgba(72, 54, 36, 0.22);
+  --divider: rgba(72, 54, 36, 0.08);
+
+  /* Ink */
+  --ink-1: #2e2418;
+  --ink-2: #5b4a36;
+  --ink-3: #8a7860;
+  --ink-4: #b5a890;
+  --on-accent: #ffffff;
+
+  /* Primary — terracotta (上書き可能) */
+  --accent: #e07550;
+  --accent-strong: #c45c3a;
+  --accent-soft: #fbe4d8;
+  --accent-ink: #93351b;
+
+  /* Secondary */
+  --sage: #7da380;
+  --sage-soft: #e2ede3;
+
+  /* Walls */
+  --wall: #a78867;
+  --wall-strong: #8b6b47;
+
+  /* Semantic */
+  --status-open: #5b9466;
+  --status-open-soft: #dfecdf;
+  --status-prep: #d49241;
+  --status-prep-soft: #faebd0;
+  --status-closed: #a09484;
+  --status-closed-soft: #ebe5d9;
+
+  /* Category */
+  --cat-food: #d75e4a;    --cat-food-soft: #fae3dc;
+  --cat-drink: #4d8db8;   --cat-drink-soft: #dde9f1;
+  --cat-goods: #c89344;   --cat-goods-soft: #faecd0;
+  --cat-service: #6a9d6f; --cat-service-soft: #ddeadd;
+  --cat-stage: #9460b8;   --cat-stage-soft: #eadff2;
+  --cat-info: #7b7665;    --cat-info-soft: #ebe7da;
+
+  /* Radii */
+  --r-xs: 6px;
+  --r-sm: 10px;
+  --r-md: 14px;
+  --r-lg: 18px;
+  --r-xl: 24px;
+  --r-pill: 999px;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(72, 54, 36, 0.08), 0 0 0 0.5px rgba(72, 54, 36, 0.04);
+  --shadow-md: 0 4px 14px rgba(72, 54, 36, 0.1), 0 0 0 0.5px rgba(72, 54, 36, 0.06);
+  --shadow-lg: 0 18px 50px rgba(72, 54, 36, 0.18), 0 0 0 0.5px rgba(72, 54, 36, 0.08);
+  --shadow-tile: 0 1px 0 rgba(72, 54, 36, 0.06), 0 3px 6px -2px rgba(72, 54, 36, 0.1);
+  --shadow-tile-hover: 0 4px 14px -2px rgba(72, 54, 36, 0.18), 0 2px 6px -1px rgba(72, 54, 36, 0.1);
+
+  /* Typography */
+  --font-sans: 'Noto Sans JP', -apple-system, BlinkMacSystemFont, 'Hiragino Kaku Gothic ProN', 'Yu Gothic', Meiryo, sans-serif;
+  --font-display: 'Noto Sans JP', -apple-system, BlinkMacSystemFont, 'Hiragino Kaku Gothic ProN', 'Yu Gothic', Meiryo, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', ui-monospace, Menlo, Consolas, monospace;
+}
+
+/* ─── ダークテーマ ─── */
+.theme-dark {
+  --bg: #1c1812;
+  --bg-2: #25201a;
+  --surface: #292319;
+  --surface-2: #2e2820;
+  --canvas: #1f1a13;
+  --paper-line: rgba(255, 255, 255, 0.05);
+  --border: rgba(255, 236, 210, 0.1);
+  --border-strong: rgba(255, 236, 210, 0.18);
+  --divider: rgba(255, 236, 210, 0.06);
+  --ink-1: #f5ecd9;
+  --ink-2: #c9bda4;
+  --ink-3: #9a8e7a;
+  --ink-4: #6c6354;
+  --accent-soft: rgba(224, 117, 80, 0.18);
+  --wall: #8b6b47;
+}

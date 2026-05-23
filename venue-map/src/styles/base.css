@@ -1,0 +1,269 @@
+/* ─────────────────────────────────────────────────────────
+   Base styles & App shell layout
+   ───────────────────────────────────────────────────── */
+
+* { box-sizing: border-box; }
+html, body, #app { height: 100%; margin: 0; padding: 0; }
+
+body {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--ink-1);
+  background:
+    radial-gradient(1200px 600px at 20% 0%, rgba(224, 117, 80, 0.05), transparent 50%),
+    radial-gradient(1200px 600px at 80% 100%, rgba(125, 163, 128, 0.05), transparent 50%),
+    var(--bg);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow-x: auto;
+}
+
+button { font-family: inherit; cursor: pointer; }
+input, select, textarea { font-family: inherit; color: inherit; }
+
+.mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+.display { font-family: var(--font-display); font-weight: 600; }
+
+/* ─────────────────────────────────────────────────────────
+   App Shell Grid
+   ───────────────────────────────────────────────────── */
+.app {
+  display: grid;
+  grid-template-rows: 56px minmax(0, 1fr) 32px;
+  grid-template-columns: 56px 280px minmax(0, 1fr) 300px;
+  grid-template-areas:
+    "top top top top"
+    "rail side canvas insp"
+    "stat stat stat stat";
+  height: 100vh;
+  width: 100vw;
+  min-width: 1100px;
+  overflow: hidden;
+}
+
+.app.no-insp {
+  grid-template-columns: 56px 280px minmax(0, 1fr) 0;
+}
+.app.no-insp .insp { display: none; }
+
+/* サイドバー右配置 */
+.app.side-right {
+  grid-template-columns: 56px minmax(0, 1fr) 300px 280px;
+  grid-template-areas:
+    "top top top top"
+    "rail canvas insp side"
+    "stat stat stat stat";
+}
+.app.side-right .side { border-left: 1px solid var(--border); border-right: 0; }
+.app.side-right .insp { border-right: 1px solid var(--border); border-left: 0; }
+
+.topbar    { grid-area: top; }
+.rail      { grid-area: rail; }
+.side      { grid-area: side; }
+.canvas-area { grid-area: canvas; }
+.insp      { grid-area: insp; }
+.statusbar { grid-area: stat; }
+
+/* ─────────────────────────────────────────────────────────
+   共通ボタン・コントロール
+   ───────────────────────────────────────────────────── */
+.icon-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--ink-2);
+  transition: all 0.15s;
+}
+.icon-btn:hover { background: var(--bg-2); color: var(--ink-1); }
+.icon-btn.active { background: var(--accent-soft); color: var(--accent-ink); }
+.icon-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.icon-btn svg { width: 17px; height: 17px; }
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 14px;
+  border-radius: var(--r-pill);
+  border: 1.5px solid var(--border);
+  background: var(--surface);
+  color: var(--ink-1);
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.15s;
+}
+.btn:hover { background: var(--bg-2); border-color: var(--border-strong); transform: translateY(-1px); }
+.btn:active { transform: translateY(0); }
+.btn.primary {
+  background: var(--accent);
+  color: var(--on-accent);
+  border-color: var(--accent-strong);
+  box-shadow: 0 2px 0 var(--accent-strong), 0 3px 6px rgba(224, 117, 80, 0.25);
+}
+.btn.primary:hover { background: var(--accent-strong); box-shadow: 0 1px 0 var(--accent-strong), 0 4px 8px rgba(224, 117, 80, 0.3); }
+.btn.ghost { border-color: transparent; background: transparent; color: var(--ink-2); box-shadow: none; }
+.btn.ghost:hover { background: var(--bg-2); color: var(--ink-1); transform: none; }
+.btn.danger { color: #b04030; border-color: rgba(176, 64, 48, 0.2); background: rgba(176, 64, 48, 0.06); }
+.btn.danger:hover { background: rgba(176, 64, 48, 0.12); }
+.btn.sm { height: 30px; padding: 0 12px; font-size: 12px; }
+.btn svg { width: 14px; height: 14px; }
+.btn:disabled { opacity: 0.4; pointer-events: none; }
+
+.kbd {
+  display: inline-block;
+  padding: 1px 6px;
+  font-size: 10px;
+  font-family: var(--font-mono);
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--ink-3);
+}
+
+/* ─────────────────────────────────────────────────────────
+   フィールド
+   ───────────────────────────────────────────────────── */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-bottom: 12px;
+}
+.field:last-child { margin-bottom: 0; }
+.field label { font-size: 11.5px; color: var(--ink-3); font-weight: 500; }
+.field input, .field select, .field textarea {
+  width: 100%;
+  height: 34px;
+  padding: 0 12px;
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  font-size: 13px;
+  outline: none;
+  color: var(--ink-1);
+  transition: all 0.15s;
+}
+.field textarea {
+  height: auto;
+  min-height: 64px;
+  padding: 8px 12px;
+  resize: vertical;
+  border-radius: 12px;
+}
+.field input:focus, .field select:focus, .field textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+.field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+/* ─────────────────────────────────────────────────────────
+   ステータスピル
+   ───────────────────────────────────────────────────── */
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  padding: 0 9px 0 7px;
+  border-radius: var(--r-pill);
+  font-size: 11px;
+  font-weight: 500;
+}
+.status-pill .dot { width: 6px; height: 6px; border-radius: 50%; }
+.status-pill.open { background: var(--status-open-soft); color: var(--status-open); }
+.status-pill.open .dot { background: var(--status-open); }
+.status-pill.prep { background: var(--status-prep-soft); color: var(--status-prep); }
+.status-pill.prep .dot { background: var(--status-prep); }
+.status-pill.closed { background: var(--status-closed-soft); color: var(--status-closed); }
+.status-pill.closed .dot { background: var(--status-closed); }
+
+/* ─────────────────────────────────────────────────────────
+   タグ
+   ───────────────────────────────────────────────────── */
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 24px;
+  padding: 0 10px;
+  border-radius: var(--r-pill);
+  font-size: 11.5px;
+  font-weight: 500;
+  background: var(--bg-2);
+  color: var(--ink-2);
+}
+
+/* ─────────────────────────────────────────────────────────
+   Segmented control
+   ───────────────────────────────────────────────────── */
+.seg {
+  display: flex;
+  background: var(--bg-2);
+  border-radius: var(--r-pill);
+  padding: 3px;
+}
+.seg button {
+  flex: 1;
+  border: 0;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-2);
+  height: 28px;
+  border-radius: var(--r-pill);
+  transition: all 0.12s;
+}
+.seg button.on {
+  background: var(--surface);
+  color: var(--ink-1);
+  box-shadow: var(--shadow-sm);
+  font-weight: 600;
+}
+
+/* ─────────────────────────────────────────────────────────
+   Category picker
+   ───────────────────────────────────────────────────── */
+.cat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; }
+.cat-pick {
+  height: 34px;
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  font-size: 11.5px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 9px;
+  color: var(--ink-2);
+  transition: all 0.15s;
+}
+.cat-pick:hover { background: var(--bg-2); }
+.cat-pick.on { border-color: var(--ink-1); background: var(--bg-2); color: var(--ink-1); font-weight: 600; }
+.cat-pick .dot { width: 9px; height: 9px; border-radius: 3px; flex-shrink: 0; }
+
+/* ─────────────────────────────────────────────────────────
+   アニメーション
+   ───────────────────────────────────────────────────── */
+@keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(10px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes pulse { 0%, 100% { opacity: 1 } 50% { opacity: 0.3 } }
+@keyframes dashflow { to { stroke-dashoffset: -24; } }
+@keyframes numflash {
+  0% { transform: scale(1); }
+  30% { transform: scale(1.06); }
+  100% { transform: scale(1); }
+}
