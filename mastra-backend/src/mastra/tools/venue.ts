@@ -30,13 +30,13 @@ export type TenantData = z.infer<typeof TenantSnapshot>
 const BOUNDS = { minX: 64, minY: 44, maxX: 1536, maxY: 956 }
 
 function findTenant(query: string, tenants: TenantData[]) {
-  const byId = tenants.find((t) => t.id === query)
+  const byId = tenants.find((tenant) => tenant.id === query)
   if (byId) return byId
   const num = Number.parseInt(query, 10)
   if (!Number.isNaN(num)) {
-    return tenants.find((t) => t.num === num)
+    return tenants.find((tenant) => tenant.num === num)
   }
-  return tenants.find((t) => t.name.includes(query))
+  return tenants.find((tenant) => tenant.name.includes(query))
 }
 
 function checkBounds(x: number, y: number, w: number, h: number): string | null {
@@ -47,16 +47,16 @@ function checkBounds(x: number, y: number, w: number, h: number): string | null 
 }
 
 function checkOverlap(x: number, y: number, w: number, h: number, tenants: TenantData[], excludeId?: string): TenantData | undefined {
-  return tenants.find((t) => {
-    if (t.id === excludeId) return false
-    return x < t.x + t.w && x + w > t.x && y < t.y + t.h && y + h > t.y
+  return tenants.find((candidate) => {
+    if (candidate.id === excludeId) return false
+    return x < candidate.x + candidate.w && x + w > candidate.x && y < candidate.y + candidate.h && y + h > candidate.y
   })
 }
 
 type Rect = { x: number; y: number; w: number; h: number }
 
-function rectsOverlap(a: Rect, b: Rect): boolean {
-  return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y
+function rectsOverlap(rectA: Rect, rectB: Rect): boolean {
+  return rectA.x < rectB.x + rectB.w && rectA.x + rectA.w > rectB.x && rectA.y < rectB.y + rectB.h && rectA.y + rectA.h > rectB.y
 }
 
 function layoutGroup(
@@ -67,27 +67,27 @@ function layoutGroup(
   gap: number,
   tenants: TenantData[],
 ): { updates: Array<{ id: string; x: number; y: number }>; label: string } | { error: string } {
-  const resolved = queries.map((q) => findTenant(q, tenants)).filter((t): t is TenantData => t !== undefined)
+  const resolved = queries.map((query) => findTenant(query, tenants)).filter((tenant): tenant is TenantData => tenant !== undefined)
   if (resolved.length === 0) return { error: `テナントが見つかりません: ${queries.join(', ')}` }
 
   const updates: Array<{ id: string; x: number; y: number }> = []
   let curX = startX
   let curY = startY
 
-  for (const t of resolved) {
-    const boundsErr = checkBounds(curX, curY, t.w, t.h)
+  for (const tenant of resolved) {
+    const boundsErr = checkBounds(curX, curY, tenant.w, tenant.h)
     if (boundsErr) {
       const suggestion = direction === 'column'
         ? ` 対策: direction='row'（横並び）に変更して再試行してください。`
         : ` 対策: direction='column'（縦並び）に変更するか、startX を小さくして再試行してください。`
-      return { error: `「${t.name}」: ${boundsErr}${suggestion}` }
+      return { error: `「${tenant.name}」: ${boundsErr}${suggestion}` }
     }
-    updates.push({ id: t.id, x: curX, y: curY })
-    if (direction === 'row') curX += t.w + gap
-    else curY += t.h + gap
+    updates.push({ id: tenant.id, x: curX, y: curY })
+    if (direction === 'row') curX += tenant.w + gap
+    else curY += tenant.h + gap
   }
 
-  const label = `${resolved.map((t) => t.name).join('・')} → (${startX}, ${startY}) ${direction === 'row' ? '横並び' : '縦並び'}`
+  const label = `${resolved.map((tenant) => tenant.name).join('・')} → (${startX}, ${startY}) ${direction === 'row' ? '横並び' : '縦並び'}`
   return { updates, label }
 }
 
@@ -96,23 +96,23 @@ function validateBatchUpdates(
   movedIds: Set<string>,
   tenants: TenantData[],
 ): string | null {
-  const getSize = (id: string) => tenants.find((t) => t.id === id)!
+  const getTenant = (id: string) => tenants.find((tenant) => tenant.id === id)!
 
-  for (const u of allUpdates) {
-    const t = getSize(u.id)
-    const uRect: Rect = { x: u.x, y: u.y, w: t.w, h: t.h }
-    const clash = tenants.find((other) => !movedIds.has(other.id) && rectsOverlap(uRect, other))
-    if (clash) return `「${t.name}」の移動先が「${clash.name}」と重なります。startX/startY または gap を調整してください。`
+  for (const update of allUpdates) {
+    const tenant = getTenant(update.id)
+    const updateRect: Rect = { x: update.x, y: update.y, w: tenant.w, h: tenant.h }
+    const clash = tenants.find((other) => !movedIds.has(other.id) && rectsOverlap(updateRect, other))
+    if (clash) return `「${tenant.name}」の移動先が「${clash.name}」と重なります。startX/startY または gap を調整してください。`
   }
 
   for (let i = 0; i < allUpdates.length; i++) {
     for (let j = i + 1; j < allUpdates.length; j++) {
-      const a = allUpdates[i]
-      const b = allUpdates[j]
-      const ta = getSize(a.id)
-      const tb = getSize(b.id)
-      if (rectsOverlap({ x: a.x, y: a.y, w: ta.w, h: ta.h }, { x: b.x, y: b.y, w: tb.w, h: tb.h })) {
-        return `「${ta.name}」と「${tb.name}」の配置先が重なります。gap を大きくしてください。`
+      const updateA = allUpdates[i]
+      const updateB = allUpdates[j]
+      const tenantA = getTenant(updateA.id)
+      const tenantB = getTenant(updateB.id)
+      if (rectsOverlap({ x: updateA.x, y: updateA.y, w: tenantA.w, h: tenantA.h }, { x: updateB.x, y: updateB.y, w: tenantB.w, h: tenantB.h })) {
+        return `「${tenantA.name}」と「${tenantB.name}」の配置先が重なります。gap を大きくしてください。`
       }
     }
   }
@@ -125,35 +125,35 @@ export function createVenueTools(tenants: TenantData[], zones: ZoneData[] = []) 
       description: '現在の会場レイアウトを取得します。全テナントの位置・ゾーン所属・番号を確認でき、操作前の状態把握や指示との整合性確認に使います。',
       inputSchema: jsonSchema<Record<string, never>>({ type: 'object', properties: {} }),
       execute: async () => {
-        const zoneOf = (t: TenantData): string => {
+        const zoneOf = (tenant: TenantData): string => {
           if (zones.length === 0) return '未分類'
-          const z = zones.find(
-            (zone) =>
-              zone.minX !== undefined &&
-              zone.maxX !== undefined &&
-              zone.minY !== undefined &&
-              zone.maxY !== undefined &&
-              t.x >= zone.minX &&
-              t.x < zone.maxX &&
-              t.y >= zone.minY &&
-              t.y < zone.maxY,
+          const zone = zones.find(
+            (z) =>
+              z.minX !== undefined &&
+              z.maxX !== undefined &&
+              z.minY !== undefined &&
+              z.maxY !== undefined &&
+              tenant.x >= z.minX &&
+              tenant.x < z.maxX &&
+              tenant.y >= z.minY &&
+              tenant.y < z.maxY,
           )
-          return z?.label ?? 'ゾーン外'
+          return zone?.label ?? 'ゾーン外'
         }
 
-        const layout = tenants.map((t) => ({
-          id: t.id,
-          name: t.name,
-          cat: t.cat,
-          num: t.num,
-          x: t.x,
-          y: t.y,
-          zone: zoneOf(t),
+        const layout = tenants.map((tenant) => ({
+          id: tenant.id,
+          name: tenant.name,
+          cat: tenant.cat,
+          num: tenant.num,
+          x: tenant.x,
+          y: tenant.y,
+          zone: zoneOf(tenant),
         }))
 
-        const zoneCounts = zones.map((z) => {
-          const count = layout.filter((t) => t.zone === z.label).length
-          return `${z.label}: ${count}件`
+        const zoneCounts = zones.map((zone) => {
+          const count = layout.filter((entry) => entry.zone === zone.label).length
+          return `${zone.label}: ${count}件`
         })
 
         return {
@@ -173,14 +173,14 @@ export function createVenueTools(tenants: TenantData[], zones: ZoneData[] = []) 
         }
         const result = zones.map((zone) => {
           const inZone = (zone.minX !== undefined && zone.maxX !== undefined && zone.minY !== undefined && zone.maxY !== undefined)
-            ? tenants.filter((t) => t.x >= zone.minX! && t.x < zone.maxX! && t.y >= zone.minY! && t.y < zone.maxY!)
+            ? tenants.filter((tenant) => tenant.x >= zone.minX! && tenant.x < zone.maxX! && tenant.y >= zone.minY! && tenant.y < zone.maxY!)
             : []
           return {
             label: zone.label,
             bounds: { minX: zone.minX, maxX: zone.maxX, minY: zone.minY, maxY: zone.maxY },
             startX: zone.minX ?? zone.x,
             startY: zone.minY === undefined ? zone.y : zone.minY + 32,
-            tenants: inZone.map((t) => ({ id: t.id, name: t.name, num: t.num, cat: t.cat })),
+            tenants: inZone.map((tenant) => ({ id: tenant.id, name: tenant.name, num: tenant.num, cat: tenant.cat })),
           }
         })
         return { success: true, zones: result }
@@ -199,19 +199,19 @@ export function createVenueTools(tenants: TenantData[], zones: ZoneData[] = []) 
         required: ['tenantA', 'tenantB'],
       }),
       execute: async ({ tenantA, tenantB }) => {
-        const a = findTenant(tenantA, tenants)
-        const b = findTenant(tenantB, tenants)
+        const foundA = findTenant(tenantA, tenants)
+        const foundB = findTenant(tenantB, tenants)
 
-        if (!a) return { success: false, message: `テナントが見つかりません: ${tenantA}` }
-        if (!b) return { success: false, message: `テナントが見つかりません: ${tenantB}` }
+        if (!foundA) return { success: false, message: `テナントが見つかりません: ${tenantA}` }
+        if (!foundB) return { success: false, message: `テナントが見つかりません: ${tenantB}` }
 
         return {
           success: true,
           updates: [
-            { id: a.id, x: b.x, y: b.y, w: b.w, h: b.h },
-            { id: b.id, x: a.x, y: a.y, w: a.w, h: a.h },
+            { id: foundA.id, x: foundB.x, y: foundB.y, w: foundB.w, h: foundB.h },
+            { id: foundB.id, x: foundA.x, y: foundA.y, w: foundA.w, h: foundA.h },
           ],
-          message: `「${a.name}」と「${b.name}」の位置を入れ替えました`,
+          message: `「${foundA.name}」と「${foundB.name}」の位置を入れ替えました`,
         }
       },
     }),
@@ -229,21 +229,21 @@ export function createVenueTools(tenants: TenantData[], zones: ZoneData[] = []) 
         required: ['tenant', 'x', 'y'],
       }),
       execute: async ({ tenant, x, y }) => {
-        const t = findTenant(tenant, tenants)
-        if (!t) return { success: false, message: `テナントが見つかりません: ${tenant}` }
+        const found = findTenant(tenant, tenants)
+        if (!found) return { success: false, message: `テナントが見つかりません: ${tenant}` }
 
-        const boundsErr = checkBounds(x, y, t.w, t.h)
+        const boundsErr = checkBounds(x, y, found.w, found.h)
         if (boundsErr) return { success: false, message: boundsErr }
 
-        const overlap = checkOverlap(x, y, t.w, t.h, tenants, t.id)
+        const overlap = checkOverlap(x, y, found.w, found.h, tenants, found.id)
         if (overlap) {
           return { success: false, message: `移動先で「${overlap.name}」と重なります。別の座標を指定してください。` }
         }
 
         return {
           success: true,
-          update: { id: t.id, x, y },
-          message: `「${t.name}」を座標 (${x}, ${y}) に移動しました`,
+          update: { id: found.id, x, y },
+          message: `「${found.name}」を座標 (${x}, ${y}) に移動しました`,
         }
       },
     }),
@@ -294,11 +294,11 @@ export function createVenueTools(tenants: TenantData[], zones: ZoneData[] = []) 
           if (!Number.isInteger(num) || num < 1) {
             return { success: false, message: '呼び出し番号は1以上の整数で指定してください。' }
           }
-          const dup = tenants.find((t) => t.num === num)
-          if (dup) {
+          const duplicate = tenants.find((tenant) => tenant.num === num)
+          if (duplicate) {
             return {
               success: false,
-              message: `呼び出し番号 ${num} は「${dup.name}」が既に使用しています。`,
+              message: `呼び出し番号 ${num} は「${duplicate.name}」が既に使用しています。`,
             }
           }
         }
@@ -338,12 +338,12 @@ export function createVenueTools(tenants: TenantData[], zones: ZoneData[] = []) 
         required: ['tenant'],
       }),
       execute: async ({ tenant }) => {
-        const t = findTenant(tenant, tenants)
-        if (!t) return { success: false, message: `テナントが見つかりません: ${tenant}` }
+        const found = findTenant(tenant, tenants)
+        if (!found) return { success: false, message: `テナントが見つかりません: ${tenant}` }
         return {
           success: true,
-          id: t.id,
-          message: `「${t.name}」を削除しました`,
+          id: found.id,
+          message: `「${found.name}」を削除しました`,
         }
       },
     }),
@@ -360,24 +360,24 @@ export function createVenueTools(tenants: TenantData[], zones: ZoneData[] = []) 
         required: ['tenant', 'num'],
       }),
       execute: async ({ tenant, num }) => {
-        const t = findTenant(tenant, tenants)
-        if (!t) return { success: false, message: `テナントが見つかりません: ${tenant}` }
+        const found = findTenant(tenant, tenants)
+        if (!found) return { success: false, message: `テナントが見つかりません: ${tenant}` }
 
         if (!Number.isInteger(num) || num < 1) {
           return { success: false, message: '呼び出し番号は1以上の整数で指定してください。' }
         }
-        const dup = tenants.find((other) => other.id !== t.id && other.num === num)
-        if (dup) {
+        const duplicate = tenants.find((other) => other.id !== found.id && other.num === num)
+        if (duplicate) {
           return {
             success: false,
-            message: `呼び出し番号 ${num} は「${dup.name}」が既に使用しています。`,
+            message: `呼び出し番号 ${num} は「${duplicate.name}」が既に使用しています。`,
           }
         }
 
         return {
           success: true,
-          update: { id: t.id, num },
-          message: `「${t.name}」の呼び出し番号を ${num} に設定しました`,
+          update: { id: found.id, num },
+          message: `「${found.name}」の呼び出し番号を ${num} に設定しました`,
         }
       },
     }),
@@ -392,12 +392,12 @@ export function createVenueTools(tenants: TenantData[], zones: ZoneData[] = []) 
         required: ['tenant'],
       }),
       execute: async ({ tenant }) => {
-        const t = findTenant(tenant, tenants)
-        if (!t) return { success: false, message: `テナントが見つかりません: ${tenant}` }
+        const found = findTenant(tenant, tenants)
+        if (!found) return { success: false, message: `テナントが見つかりません: ${tenant}` }
         return {
           success: true,
-          update: { id: t.id, num: null },
-          message: `「${t.name}」の呼び出し番号を削除しました`,
+          update: { id: found.id, num: null },
+          message: `「${found.name}」の呼び出し番号を削除しました`,
         }
       },
     }),
@@ -451,7 +451,7 @@ export function createVenueTools(tenants: TenantData[], zones: ZoneData[] = []) 
         for (const move of moves) {
           const result = layoutGroup(move.tenants, move.startX, move.startY, move.direction, move.gap ?? 20, tenants)
           if ('error' in result) return { success: false, message: result.error }
-          result.updates.forEach((u) => { allUpdates.push(u); movedIds.add(u.id) })
+          result.updates.forEach((update) => { allUpdates.push(update); movedIds.add(update.id) })
           labels.push(result.label)
         }
 
@@ -487,26 +487,26 @@ num に null を指定するとそのテナントの番号を削除します。`
         required: ['assignments'],
       }),
       execute: async ({ assignments }) => {
-        const nums = assignments.map((a) => a.num).filter((n): n is number => n !== null)
+        const nums = assignments.map((assignment) => assignment.num).filter((num): num is number => num !== null)
         if (new Set(nums).size !== nums.length) {
           return { success: false, message: 'バッチ内に重複した番号があります。各テナントに異なる番号を指定してください。' }
         }
-        for (const a of assignments) {
-          if (a.num !== null && (!Number.isInteger(a.num) || a.num < 1)) {
-            return { success: false, message: `呼び出し番号は1以上の整数で指定してください: ${a.num}` }
+        for (const assignment of assignments) {
+          if (assignment.num !== null && (!Number.isInteger(assignment.num) || assignment.num < 1)) {
+            return { success: false, message: `呼び出し番号は1以上の整数で指定してください: ${assignment.num}` }
           }
         }
 
         const updates: Array<{ id: string; num: number | null }> = []
-        for (const a of assignments) {
-          const t = findTenant(a.tenant, tenants)
-          if (!t) return { success: false, message: `テナントが見つかりません: ${a.tenant}` }
-          updates.push({ id: t.id, num: a.num })
+        for (const assignment of assignments) {
+          const found = findTenant(assignment.tenant, tenants)
+          if (!found) return { success: false, message: `テナントが見つかりません: ${assignment.tenant}` }
+          updates.push({ id: found.id, num: assignment.num })
         }
 
-        const names = updates.map((u) => {
-          const t = tenants.find((t) => t.id === u.id)!
-          return `${t.name}→${u.num ?? '削除'}`
+        const names = updates.map((update) => {
+          const tenant = tenants.find((tenant) => tenant.id === update.id)!
+          return `${tenant.name}→${update.num ?? '削除'}`
         }).join(', ')
         return { success: true, updates, message: `${updates.length}件の呼び出し番号を設定しました: ${names}` }
       },
@@ -525,13 +525,13 @@ num に null を指定するとそのテナントの番号を削除します。`
           return { success: false, message: '開始番号は1以上の整数で指定してください。' }
         }
         const ROW_TOLERANCE = 40
-        const sorted = [...tenants].sort((a, b) => {
-          const rowA = Math.round(a.y / ROW_TOLERANCE)
-          const rowB = Math.round(b.y / ROW_TOLERANCE)
-          return rowA === rowB ? a.x - b.x : rowA - rowB
+        const sorted = [...tenants].sort((tenantA, tenantB) => {
+          const rowA = Math.round(tenantA.y / ROW_TOLERANCE)
+          const rowB = Math.round(tenantB.y / ROW_TOLERANCE)
+          return rowA === rowB ? tenantA.x - tenantB.x : rowA - rowB
         })
 
-        const assignments = sorted.map((t, i) => ({ id: t.id, num: startFrom + i }))
+        const assignments = sorted.map((tenant, index) => ({ id: tenant.id, num: startFrom + index }))
 
         return {
           success: true,
