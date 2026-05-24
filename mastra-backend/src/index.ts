@@ -5,7 +5,7 @@ import { generateText } from 'ai'
 import { createAnthropic } from '@ai-sdk/anthropic'
 import { createOpenAI } from '@ai-sdk/openai'
 import { createGoogleGenerativeAI } from '@ai-sdk/google'
-import { createVenueTools, TenantSnapshot } from './mastra/tools/venue'
+import { createVenueTools, TenantSnapshot, ZoneSnapshot, type TenantData, type ZoneData } from './mastra/tools/venue'
 
 const PORT = 4111
 
@@ -29,12 +29,17 @@ type LLMKey = keyof typeof modelMap
 
 const SYSTEM_PROMPT = `あなたはイベント会場の設営・運営をサポートするAIアシスタントです。
 
-## 応答の絶対ルール（最優先）
-- テキストによる分析・計画・説明は禁止。必ずツール呼び出しを先に行い、すべて完了後に1〜3文で結果を報告する
-- 「〇〇しようと思います」「〇〇します」のような宣言文は書かない。直接ツールを実行する
-- ユーザーの指示は確認や質問なしに即座に実行する
+## 行動の基本方針
+- 必ずツール呼び出しを最初のアクションにすること。テキストのみで応答した時点で処理が確定しツールは実行されない（技術的制約）
+- テキストによる分析・計画・宣言は禁止。全ツール操作の完了後にのみ1〜3文で報告する
+- ユーザーの指示は基本的に確認なしに即座に実行する
+- ただし、対象が一切特定できない場合や操作が取り消せない重大な場合は確認してよい
+- テナント名が部分一致・類似の場合は最も近いものを採用して即実行する
+- 複数の候補がある場合は最も合理的なものを選んで即実行する
 
 ## 利用可能なツール
+- get_layout: 全テナントの現在位置・ゾーン所属を取得する（現状把握・操作後の整合性確認に使う）
+- get_zones: 会場のゾーン一覧と各ゾーン内のテナントを取得する（ゾーン操作の前に呼び出して現状を把握する）
 - batch_rearrange: 複数グループを同時に再配置（ゾーン入れ替えはこれを使う）
 - swap_tenant_positions: 2テナントの位置を入れ替える
 - move_tenant: 1テナントを指定座標に移動する
@@ -45,43 +50,24 @@ const SYSTEM_PROMPT = `あなたはイベント会場の設営・運営をサポ
 - bulk_set_numbers: 複数テナントの番号を一括付け替え（番号の並び替え・再割り当てはこれを使う。clear → set の2段階が不要）
 - auto_assign_numbers: 全テナントの番号を左上→右→下の順で自動採番する
 
-## 会場ゾーン定義（重要）
-| ゾーン | 名称 | X範囲 | Y範囲 | 代表座標 |
-|--------|------|--------|--------|----------|
-| Aゾーン | フードエリア | 140〜860 | 168〜480 | startX=140, startY=200 |
-| Bゾーン | メインステージ | 900〜1180 | 168〜420 | startX=900, startY=200 |
-| Cゾーン | 物販エリア | 1280〜1536 | 168〜760 | startX=1280, startY=200 |
-| Dゾーン | ワークショップ | 600〜1000 | 548〜760 | startX=600, startY=580 |
-| Eゾーン | ポップアップ | 140〜380 | 548〜760 | startX=140, startY=580 |
-
-有効配置エリア: x=64〜1536, y=44〜956（壁の内側）
-正面入口: x=740, y=30付近（y が小さいほど入口寄り）
-南口: x=740, y=956付近（y が大きいほど南口寄り。南口近くに移動するには startY=800〜856 付近を使う）
+## 会場の基本情報
+- 配置可能範囲と境界はツールのバリデーションで自動検証される
+- 正面入口: y 座標が小さいほど入口寄り
+- 南口: y 座標が大きいほど南口寄り
+- ゾーン情報（名称・境界・テナント一覧）が必要な場合は get_zones を呼び出す
 
 ## ツールの選択基準
 - ゾーン間の入れ替え・グループ移動 → batch_rearrange（1回の呼び出しで両グループを同時指定）
 - 2テナントの位置交換 → swap_tenant_positions
 - 1テナントを空きスペースへ移動 → move_tenant
+- 番号の並び替え・再割り当て → bulk_set_numbers
+- ゾーン情報の追加確認が必要なとき → get_zones（通常は不要。ユーザーメッセージに「ゾーン情報」が含まれている）
+- 現在のレイアウト全体を確認したいとき → get_layout
 
-## 複数テナントの配置方向ルール（重要）
-- 縦並び（direction:'column'）は少数（〜3件）のみ。テナント1件あたり高さ+gapが必要なため、南口付近（y≥800）では3件以上で会場外エラーが必ず発生する
-- 4件以上を南口付近に配置する場合は必ず direction:'row'（横並び）を使う
-- 8件横並びの例: startX=140, startY=820, direction:'row', gap=20 → 幅約1100px、y=820〜920で会場内に収まる
-
-## ツールエラー時のリトライ戦略（絶対厳守）
-success: false を受け取ったら、テキストを生成せず、即座に次のいずれかのツール呼び出しを実行せよ。テキスト応答は全ツール操作が完了するまで禁止。
-
-### 「会場外」エラー → 方向転換が最優先
-1. direction が 'column' の場合 → 'row' に切り替えて同じ startX/startY で即再試行
-2. 'row' でも会場外 → startX を 64 に近づけるか startY を 750〜820 の範囲で調整して再試行
-
-### 「重なります」エラー → 座標調整
-1. startY を ±120〜200 変えて再試行
-2. gap を 20 → 60 → 140 と段階的に拡大して再試行
-3. batch_rearrange が3回失敗 → move_tenant で1件ずつ個別に移動
-
-### 諦める条件（3回以上異なるパラメータで試みてすべて失敗した場合のみ）
-「移動できませんでした: （理由）」と報告する
+## 情報取得ツール（get_layout / get_zones）の使用ルール
+- 呼び出した後は中間テキストを生成せず、即座にテナント操作ツールを続けること
+- 操作なしに終了することは禁止（操作ツールを必ずセットで呼び出す）
+- 操作完了後、実行した結果がユーザーの指示を満たしているか判断し、不足があれば追加操作を行う
 
 ## カテゴリ定義（テナント一覧の cat フィールド）
 | cat値 | 表示名 | ユーザーが使う言葉 |
@@ -98,18 +84,42 @@ success: false を受け取ったら、テキストを生成せず、即座に�
 - 「ドリンクテナント」→ cat='drink' のみ
 - 「飲食・ドリンク」「食べ物・飲み物系」と明示された場合のみ両カテゴリを対象にする
 
-## テナントの自律的な特定
-- ゾーン名（Aゾーン・フードエリアなど）→ 上記の定義から座標範囲を確認してそのゾーン内のテナントを対象にする
-- テナント名が部分一致・類似 → 最も近い名前を採用して実行
-- 「入口近く」→ y が最小、「南口近く」「奥」→ y=800〜856 付近
-- 複数候補 → 最も合理的なものを選んで即実行
+## 座標リファレンス（位置指定の目安）
+会場有効範囲: x=64〜1536, y=44〜956（壁の内側）
+- 正面入口（北）付近: y ≈ 44〜200
+- 南口付近: y ≈ 760〜950
+- 西エリア: x ≈ 64〜500
+- 東エリア: x ≈ 1100〜1536
+- 中央エリア: x ≈ 400〜1100, y ≈ 300〜700
+
+## ツールエラー時のリトライ戦略（絶対厳守）
+success: false を受け取ったら、テキストを生成せず、エラーメッセージの提案に従って即座にツールを再呼び出せ。テキスト応答は全ツール操作が完了するまで禁止。
+
+- 「会場外」エラー → エラーメッセージに示された対策（方向変更・座標調整）を試みる
+- 「重なります」エラー → startY/startX または gap を変えて再試行。batch_rearrange が3回失敗したら move_tenant で個別移動
+- 3回以上異なるパラメータで試みてすべて失敗した場合のみ「移動できませんでした: （理由）」と報告する
 
 ## 最終報告ルール
 - 一部でも成功した操作があれば、成功した内容と失敗した内容を1〜3文で報告する
-- 「完了しました。」は1件以上成功した場合のみ使用する
+- 「完了しました。」は1件以上成功した場合のみ使用する`
 
-## 質問・確認をしてよい唯一の例外
-テナント名・番号・位置・ゾーンの手がかりが一切なく、どう解釈しても対象を特定できない場合のみ質問する。`
+function buildZoneSummary(tenants: TenantData[], zones: ZoneData[]): string {
+  if (zones.length === 0) return ''
+  const lines = zones.map((zone) => {
+    const hasBounds = zone.minX !== undefined && zone.maxX !== undefined && zone.minY !== undefined && zone.maxY !== undefined
+    const inZone = hasBounds
+      ? tenants.filter((t) => t.x >= zone.minX! && t.x < zone.maxX! && t.y >= zone.minY! && t.y < zone.maxY!)
+      : []
+    const startY = zone.minY === undefined ? zone.y : zone.minY + 32
+    const w = hasBounds ? zone.maxX! - zone.minX! : undefined
+    const h = hasBounds ? zone.maxY! - zone.minY! : undefined
+    const recommendedDir = w !== undefined && h !== undefined ? (w >= h ? 'row' : 'column') : ''
+    const dimHint = w !== undefined ? `, ゾーンサイズ:${w}×${h}px, 推奨direction:${recommendedDir}` : ''
+    const tenantList = inZone.length > 0 ? inZone.map((t) => `${t.name}(ID:${t.id})`).join(', ') : 'テナントなし'
+    return `  - ${zone.label} [startX=${zone.minX ?? zone.x}, startY=${startY}${dimHint}]: ${tenantList}`
+  })
+  return `\n\n# ゾーン情報（現在の配置）\n${lines.join('\n')}`
+}
 
 function buildFallbackText(toolResults: Array<{ toolName: string; result: unknown }>): string {
   type ToolResult = { success?: boolean; message?: string }
@@ -136,14 +146,14 @@ const app = new Hono()
 app.use('*', cors({ origin: '*' }))
 
 app.post('/api/chat', async (c) => {
-  let body: { message: string; tenants: unknown[]; llm?: string }
+  let body: { message: string; tenants: unknown[]; zones?: unknown[]; llm?: string }
   try {
     body = await c.req.json()
   } catch {
     return c.json({ error: 'リクエストのJSONパースに失敗しました' }, 400)
   }
 
-  const { message, tenants, llm = 'claude' } = body
+  const { message, tenants, zones = [], llm = 'claude' } = body
 
   if (!message || !Array.isArray(tenants)) {
     return c.json({ error: 'message と tenants は必須です' }, 400)
@@ -158,13 +168,16 @@ app.post('/api/chat', async (c) => {
     return c.json({ error: 'テナントデータの形式が不正です' }, 400)
   }
 
-  const tools = createVenueTools(parsedTenants.data)
+  const parsedZones = ZoneSnapshot.array().safeParse(zones)
+  const zonesData = parsedZones.success ? parsedZones.data : []
+
+  const tools = createVenueTools(parsedTenants.data, zonesData)
 
   const tenantSummary = parsedTenants.data
     .map((t) => `  - ID:${t.id} 名前:${t.name} カテゴリ:${t.cat} 番号:${t.num ?? '未設定'} 位置:(${t.x},${t.y}) サイズ:${t.w}×${t.h}`)
     .join('\n')
 
-  const userMessage = `${message}\n\n# 現在のテナント一覧\n${tenantSummary}`
+  const userMessage = `${message}\n\n# 現在のテナント一覧\n${tenantSummary}${buildZoneSummary(parsedTenants.data, zonesData)}`
 
   try {
     const result = await generateText({

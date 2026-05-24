@@ -6,7 +6,7 @@ import { useToolsStore } from '@/stores/tools'
 import { useVenueStore } from '@/stores/venue'
 import { useTweaksStore } from '@/stores/tweaks'
 import { useUIStore } from '@/stores/ui'
-import { VENUE_WIDTH, VENUE_HEIGHT, STRUCTURES, ZONES } from '@/data/seed'
+import { VENUE_WIDTH, VENUE_HEIGHT, VENUE_BOUNDS, VENUE_ENTRANCES, ZONES } from '@/data/seed'
 import type { Tenant, TrailEntry } from '@/types'
 import TenantBox from './TenantBox.vue'
 import NumberBanner from './NumberBanner.vue'
@@ -14,6 +14,34 @@ import Minimap from './Minimap.vue'
 import Icon from './icons/Icon.vue'
 
 const GRID = 20
+
+function makeWallSegs() {
+  const { minX: bx0, maxX: bx1, minY: by0, maxY: by1 } = VENUE_BOUNDS
+  const segs: Array<{ x1: number; y1: number; x2: number; y2: number }> = []
+  for (const side of ['top', 'bottom', 'left', 'right'] as const) {
+    const isH = side === 'top' || side === 'bottom'
+    const fixed = side === 'top' ? by0 : side === 'bottom' ? by1 : side === 'left' ? bx0 : bx1
+    const gaps = VENUE_ENTRANCES.filter((e) => e.wall === side).sort((a, b) => a.from - b.from)
+    let cur = isH ? bx0 : by0
+    const end = isH ? bx1 : by1
+    for (const g of gaps) {
+      segs.push(isH ? { x1: cur, y1: fixed, x2: g.from, y2: fixed } : { x1: fixed, y1: cur, x2: fixed, y2: g.from })
+      cur = g.to
+    }
+    segs.push(isH ? { x1: cur, y1: fixed, x2: end, y2: fixed } : { x1: fixed, y1: cur, x2: fixed, y2: end })
+  }
+  return segs
+}
+
+const BOUNDARY_LINES = makeWallSegs()
+const DIVIDER_LINE = { x1: VENUE_BOUNDS.minX, y1: 480, x2: 540, y2: 480 }
+const ENT_LABELS = VENUE_ENTRANCES.map((e) => {
+  const mid = (e.from + e.to) / 2
+  if (e.wall === 'top')    return { x: mid, y: VENUE_BOUNDS.minY - 8, label: e.label, anchor: 'middle' }
+  if (e.wall === 'bottom') return { x: mid, y: VENUE_BOUNDS.maxY + 14, label: e.label, anchor: 'middle' }
+  if (e.wall === 'left')   return { x: VENUE_BOUNDS.minX + 8, y: mid + 4, label: e.label, anchor: 'start' }
+  return { x: VENUE_BOUNDS.maxX - 8, y: mid + 4, label: e.label, anchor: 'end' }
+})
 
 const tenantsStore = useTenantsStore()
 const toolsStore = useToolsStore()
@@ -432,21 +460,23 @@ function clearTrail() { trail.value = [] }
           :class="['canvas-grid', gridStyle === 'dots' ? 'dotted' : 'major']"
         />
 
-        <!-- Structures -->
-        <template v-for="(s, i) in STRUCTURES" :key="i">
-          <div
-            v-if="s.type === 'wall'"
-            class="wall"
-            :style="{ left: s.x + 'px', top: s.y + 'px', width: s.w + 'px', height: s.h + 'px' }"
+        <!-- Venue boundary -->
+        <svg class="venue-boundary" :width="VENUE_WIDTH" :height="VENUE_HEIGHT">
+          <line
+            v-for="(seg, i) in BOUNDARY_LINES"
+            :key="'w' + i"
+            :x1="seg.x1" :y1="seg.y1" :x2="seg.x2" :y2="seg.y2"
+            class="wall-line"
           />
-          <div
-            v-else-if="s.type === 'entrance'"
-            class="entrance"
-            :style="{ left: s.x + 'px', top: s.y + 'px', width: s.w + 'px', height: s.h + 'px' }"
-          >
-            <Icon name="chevron_down" />{{ s.label }}
-          </div>
-        </template>
+          <line class="wall-divider" :x1="DIVIDER_LINE.x1" :y1="DIVIDER_LINE.y1" :x2="DIVIDER_LINE.x2" :y2="DIVIDER_LINE.y2" />
+          <text
+            v-for="(lbl, i) in ENT_LABELS"
+            :key="'el' + i"
+            :x="lbl.x" :y="lbl.y"
+            :text-anchor="lbl.anchor"
+            class="entrance-label"
+          >{{ lbl.label }}</text>
+        </svg>
 
         <!-- Zone labels -->
         <div
@@ -631,28 +661,30 @@ function clearTrail() { trail.value = [] }
   background-size: 20px 20px;
 }
 
-/* Structures */
-.wall {
+/* Venue boundary */
+.venue-boundary {
   position: absolute;
-  background: var(--wall-fill);
-  border: 1.5px solid var(--wall-stroke);
-  border-radius: 3px;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  overflow: visible;
 }
-.entrance {
-  position: absolute;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  background: var(--entrance-fill);
-  border: 1.5px dashed var(--entrance-stroke);
-  border-radius: 4px;
+.wall-line {
+  stroke: #8a8070;
+  stroke-width: 3;
+  stroke-linecap: square;
+}
+.wall-divider {
+  stroke: #b0a898;
+  stroke-width: 2;
+  stroke-dasharray: 6 4;
+  stroke-linecap: round;
+}
+.entrance-label {
   font-size: 11px;
   font-weight: 600;
-  color: var(--entrance-text);
-  letter-spacing: .04em;
+  fill: #8a8070;
 }
-.entrance svg { width: 13px; height: 13px; }
 .zone-label {
   position: absolute;
   font-size: 11px;

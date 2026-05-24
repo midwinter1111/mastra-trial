@@ -3,6 +3,7 @@ import { ref, nextTick, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useAIStore, type LLMProvider } from '@/stores/ai'
 import { useTenantsStore } from '@/stores/tenants'
+import { ZONES } from '@/data/seed'
 import Icon from './icons/Icon.vue'
 
 const aiStore = useAIStore()
@@ -80,6 +81,7 @@ async function send() {
           w: t.w,
           h: t.h,
         })),
+        zones: ZONES,
         llm: provider.value,
       }),
     })

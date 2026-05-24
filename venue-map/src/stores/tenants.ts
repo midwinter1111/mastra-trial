@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { Tenant } from '@/types'
-import { INITIAL_TENANTS, UNPLACED_TENANTS } from '@/data/seed'
+import { INITIAL_TENANTS, UNPLACED_TENANTS, VENUE_BOUNDS } from '@/data/seed'
 
 export const useTenantsStore = defineStore('tenants', () => {
   const tenants = ref<Tenant[]>(INITIAL_TENANTS.map((t) => ({ ...t })))
@@ -33,13 +33,25 @@ export const useTenantsStore = defineStore('tenants', () => {
 
   let moveBuffer: ReturnType<typeof setTimeout> | null = null
   function moveTenants(updates: Record<string, { x: number; y: number }>) {
+    const movedIds = new Set(Object.keys(updates))
+    const unmoved = tenants.value.filter((t) => !movedIds.has(t.id))
+    const moved = tenants.value
+      .filter((t) => movedIds.has(t.id))
+      .map((t) => ({ ...t, ...updates[t.id] }))
+
+    for (const t of moved) {
+      if (
+        t.x < VENUE_BOUNDS.minX || t.y < VENUE_BOUNDS.minY ||
+        t.x + t.w > VENUE_BOUNDS.maxX || t.y + t.h > VENUE_BOUNDS.maxY
+      ) return
+      if (unmoved.some((o) => t.x < o.x + o.w && t.x + t.w > o.x && t.y < o.y + o.h && t.y + t.h > o.y)) return
+    }
+
     if (!moveBuffer) {
       pushHistory()
-      moveBuffer = setTimeout(() => {
-        moveBuffer = null
-      }, 250)
+      moveBuffer = setTimeout(() => { moveBuffer = null }, 250)
     }
-    tenants.value = tenants.value.map((t) => (updates[t.id] ? { ...t, ...updates[t.id] } : t))
+    tenants.value = tenants.value.map((t) => (t.id in updates ? { ...t, ...updates[t.id] } : t))
   }
 
   function resizeTenant(id: string, dims: { w: number; h: number }) {

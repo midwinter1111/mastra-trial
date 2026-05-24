@@ -1,6 +1,18 @@
 import { tool, jsonSchema } from 'ai'
 import { z } from 'zod'
 
+export const ZoneSnapshot = z.object({
+  label: z.string(),
+  x: z.number(),
+  y: z.number(),
+  minX: z.number().optional(),
+  maxX: z.number().optional(),
+  minY: z.number().optional(),
+  maxY: z.number().optional(),
+})
+
+export type ZoneData = z.infer<typeof ZoneSnapshot>
+
 export const TenantSnapshot = z.object({
   id: z.string(),
   name: z.string(),
@@ -64,7 +76,12 @@ function layoutGroup(
 
   for (const t of resolved) {
     const boundsErr = checkBounds(curX, curY, t.w, t.h)
-    if (boundsErr) return { error: `「${t.name}」: ${boundsErr}` }
+    if (boundsErr) {
+      const suggestion = direction === 'column'
+        ? ` 対策: direction='row'（横並び）に変更して再試行してください。`
+        : ` 対策: direction='column'（縦並び）に変更するか、startX を小さくして再試行してください。`
+      return { error: `「${t.name}」: ${boundsErr}${suggestion}` }
+    }
     updates.push({ id: t.id, x: curX, y: curY })
     if (direction === 'row') curX += t.w + gap
     else curY += t.h + gap
@@ -102,8 +119,74 @@ function validateBatchUpdates(
   return null
 }
 
-export function createVenueTools(tenants: TenantData[]) {
+export function createVenueTools(tenants: TenantData[], zones: ZoneData[] = []) {
   return {
+    get_layout: tool({
+      description: '現在の会場レイアウトを取得します。全テナントの位置・ゾーン所属・番号を確認でき、操作前の状態把握や指示との整合性確認に使います。',
+      inputSchema: jsonSchema<Record<string, never>>({ type: 'object', properties: {} }),
+      execute: async () => {
+        const zoneOf = (t: TenantData): string => {
+          if (zones.length === 0) return '未分類'
+          const z = zones.find(
+            (zone) =>
+              zone.minX !== undefined &&
+              zone.maxX !== undefined &&
+              zone.minY !== undefined &&
+              zone.maxY !== undefined &&
+              t.x >= zone.minX &&
+              t.x < zone.maxX &&
+              t.y >= zone.minY &&
+              t.y < zone.maxY,
+          )
+          return z?.label ?? 'ゾーン外'
+        }
+
+        const layout = tenants.map((t) => ({
+          id: t.id,
+          name: t.name,
+          cat: t.cat,
+          num: t.num,
+          x: t.x,
+          y: t.y,
+          zone: zoneOf(t),
+        }))
+
+        const zoneCounts = zones.map((z) => {
+          const count = layout.filter((t) => t.zone === z.label).length
+          return `${z.label}: ${count}件`
+        })
+
+        return {
+          success: true,
+          tenants: layout,
+          summary: `${tenants.length}件配置中。${zoneCounts.join('、')}`,
+        }
+      },
+    }),
+
+    get_zones: tool({
+      description: '会場のゾーン一覧を返します。各ゾーンの名称・境界座標・現在配置されているテナントを確認できます。ゾーン操作の前に呼び出して現状を把握してください。',
+      inputSchema: jsonSchema<Record<string, never>>({ type: 'object', properties: {} }),
+      execute: async () => {
+        if (zones.length === 0) {
+          return { success: false, message: 'ゾーン情報が提供されていません。' }
+        }
+        const result = zones.map((zone) => {
+          const inZone = (zone.minX !== undefined && zone.maxX !== undefined && zone.minY !== undefined && zone.maxY !== undefined)
+            ? tenants.filter((t) => t.x >= zone.minX! && t.x < zone.maxX! && t.y >= zone.minY! && t.y < zone.maxY!)
+            : []
+          return {
+            label: zone.label,
+            bounds: { minX: zone.minX, maxX: zone.maxX, minY: zone.minY, maxY: zone.maxY },
+            startX: zone.minX ?? zone.x,
+            startY: zone.minY === undefined ? zone.y : zone.minY + 32,
+            tenants: inZone.map((t) => ({ id: t.id, name: t.name, num: t.num, cat: t.cat })),
+          }
+        })
+        return { success: true, zones: result }
+      },
+    }),
+
     swap_tenant_positions: tool({
       description:
         '指定した2つのテナントの配置位置（x, y 座標とサイズ）を入れ替えます。テナントは名前の一部または番号で指定します。',

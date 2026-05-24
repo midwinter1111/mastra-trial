@@ -3,6 +3,21 @@ import type { Tenant, Category, Status, Structure, Zone } from '@/types'
 export const VENUE_WIDTH = 1600
 export const VENUE_HEIGHT = 1000
 
+export const VENUE_BOUNDS = { minX: 64, minY: 44, maxX: 1536, maxY: 956 }
+
+export interface Entrance {
+  wall: 'top' | 'bottom' | 'left' | 'right'
+  from: number
+  to: number
+  label: string
+}
+
+export const VENUE_ENTRANCES: Entrance[] = [
+  { wall: 'top',    from: 740, to: 860, label: '正面入口' },
+  { wall: 'bottom', from: 740, to: 860, label: '南口' },
+  { wall: 'left',   from: 720, to: 840, label: '搬入口' },
+]
+
 export const CATEGORIES: Category[] = [
   { id: 'food',    label: '飲食',      color: '#d75e4a', soft: '#fae3dc' },
   { id: 'drink',   label: 'ドリンク',  color: '#4d8db8', soft: '#dde9f1' },
@@ -61,9 +76,9 @@ export const STRUCTURES: Structure[] = [
 ]
 
 export const ZONES: Zone[] = [
-  { x: 140,  y: 168, label: 'Aゾーン  /  フードエリア' },
-  { x: 900,  y: 168, label: 'Bゾーン  /  メインステージ' },
-  { x: 1280, y: 168, label: 'Cゾーン  /  物販' },
-  { x: 600,  y: 548, label: 'Dゾーン  /  ワークショップ' },
-  { x: 140,  y: 548, label: 'Eゾーン  /  ポップアップ' },
+  { x: 140,  y: 168, label: 'Aゾーン  /  フードエリア',    minX: 140,  maxX: 860,  minY: 168, maxY: 480 },
+  { x: 900,  y: 168, label: 'Bゾーン  /  メインステージ',  minX: 900,  maxX: 1180, minY: 168, maxY: 420 },
+  { x: 1280, y: 168, label: 'Cゾーン  /  物販',            minX: 1280, maxX: 1536, minY: 168, maxY: 760 },
+  { x: 600,  y: 548, label: 'Dゾーン  /  ワークショップ',  minX: 600,  maxX: 1000, minY: 548, maxY: 760 },
+  { x: 140,  y: 548, label: 'Eゾーン  /  ポップアップ',    minX: 140,  maxX: 380,  minY: 548, maxY: 760 },
 ]

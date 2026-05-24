@@ -48,6 +48,10 @@ export interface Zone {
   x: number
   y: number
   label: string
+  minX?: number
+  maxX?: number
+  minY?: number
+  maxY?: number
 }
 
 export interface TrailEntry {
